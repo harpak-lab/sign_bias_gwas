@@ -96,7 +96,7 @@ sdat <- sdat %>% filter(!chr %in% c("X", "Y")) %>%
 print("------------------------")
 print("Assigning ancestral states...")
 
-adir<-"/stor/work/Kirkpatrick/scratch/Jared/signbias/data/ancestral_seqs/homo_sapiens_ancestor_"
+adir<-"/ancestral_seqs/homo_sapiens_ancestor_"
 anc <- c()
 for (i in 1:22) {
   fasta_file <- paste0(adir, 

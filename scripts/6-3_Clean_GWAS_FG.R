@@ -62,7 +62,7 @@ names(sdat)[1] <- "chr"
 print("Data loaded.")
 
 # Load annotation
-fg_vars <- fread(file="/stor/scratch/Kirkpatrick/Jared/signbias/finngen/FG_variants.txt",
+fg_vars <- fread(file="/finngen/FG_variants.txt",
                  sep="\t")
 names(fg_vars)[8] <- "rsids"
 
@@ -97,7 +97,7 @@ sdat$AC <- as.numeric(sdat$AC)
 sdat$INFO <- as.numeric(sdat$INFO)
 
 ## load variants and match them
-vars_matched <- fread(file="/stor/scratch/Kirkpatrick/Jared/signbias/data/aou_matched_rsids.tsv",
+vars_matched <- fread(file="aou_matched_rsids.tsv",
                       sep="\t")
 sdat<- sdat[rsids %in% vars_matched$rsid]
 
@@ -140,7 +140,7 @@ sdat <- sdat %>% filter(!chr %in% c("X", "Y")) %>%
 print("------------------------")
 print("Assigning ancestral states...")
 
-adir<-"/stor/work/Kirkpatrick/scratch/Jared/signbias/data/ancestral_seqs/homo_sapiens_ancestor_"
+adir<-"/ancestral_seqs/homo_sapiens_ancestor_"
 anc <- rep(NA_character_, nrow(sdat))
 
 for (i in 1:22) {

@@ -1,7 +1,7 @@
 ##################################################
 ## Plotting and summary analyses
 ##################################################
-setwd("~/Documents/Projects/Sign_bias/plotting_data/updated_results/")
+setwd("~/updated_results/")
 
 #libraries
 library(data.table)

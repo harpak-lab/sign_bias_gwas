@@ -5,17 +5,17 @@
 RSCRIPT="${RSCRIPT:-Rscript}"
 
 # Scripts
-AOU_SCRIPT="/stor/work/Kirkpatrick/scratch/Jared/signbias/UKB_round2/scripts/6-1_Clean_GWAS_AoU.R"
-UKB_SCRIPT="/stor/work/Kirkpatrick/scratch/Jared/signbias/UKB_round2/scripts/6-2_Clean_GWAS_UKB.R"
-FG_SCRIPT="/stor/work/Kirkpatrick/scratch/Jared/signbias/UKB_round2/scripts/6-3_Clean_GWAS_FG.R"
+AOU_SCRIPT="/scripts/6-1_Clean_GWAS_AoU.R"
+UKB_SCRIPT="/scripts/6-2_Clean_GWAS_UKB.R"
+FG_SCRIPT="/scripts/6-3_Clean_GWAS_FG.R"
 
 # LD blocks bed (used by UKB script)
-LD_BED="/stor/work/Kirkpatrick/scratch/Jared/signbias/data/LD_EUR.bed"
+LD_BED="/data/LD_EUR.bed"
 
 # Output directories
-OUT_AOU="/stor/work/Kirkpatrick/scratch/Jared/signbias/AoU_round2/cleaned3"
-OUT_UKB="/stor/work/Kirkpatrick/scratch/Jared/signbias/UKB_round2/cleaned3"
-OUT_FG="/stor/work/Kirkpatrick/scratch/Jared/signbias/FG_round2/cleaned3"
+OUT_AOU="/cleaned"
+OUT_UKB="/cleaned"
+OUT_FG="/cleaned"
 
 LOG_AOU="${OUT_AOU}/logs"
 LOG_UKB="${OUT_UKB}/logs"
@@ -50,7 +50,7 @@ run_fg () {
   "$RSCRIPT" "$FG_SCRIPT" "$in_file" "$out_file" >> "$log_file" 2>&1
 }
 
-UKB_IN_DIR="/stor/work/Kirkpatrick/scratch/Jared/signbias/data/GWAS/Neale/round2"
+UKB_IN_DIR="/GWAS/Neale/"
 
 run_ukb "${UKB_IN_DIR}/Neale.basophil_percentage.tsv.bgz"    "${OUT_UKB}/Neale.basophil_percentage.cleaned.txt"     "${LOG_UKB}/Neale.basophil_percentage.log"
 run_ukb "${UKB_IN_DIR}/Neale.BMI.tsv.bgz"                    "${OUT_UKB}/Neale.BMI.cleaned.txt"                     "${LOG_UKB}/Neale.BMI.log"
@@ -62,7 +62,7 @@ run_ukb "${UKB_IN_DIR}/Neale.type1_diabetes.tsv.bgz"         "${OUT_UKB}/Neale.t
 run_ukb "${UKB_IN_DIR}/Neale.type2_diabetes.tsv.bgz"         "${OUT_UKB}/Neale.type2_diabetes.cleaned.txt"          "${LOG_UKB}/Neale.type2_diabetes.log"
 run_ukb "${UKB_IN_DIR}/Neale.weight.tsv.bgz"                 "${OUT_UKB}/Neale.weight.cleaned.txt"                  "${LOG_UKB}/Neale.weight.log"
 
-AOU_IN_DIR="/stor/work/Kirkpatrick/scratch/Jared/signbias/data/GWAS/AoU/round2"
+AOU_IN_DIR="/GWAS/AoU/"
 run_aou "${AOU_IN_DIR}/Asthma_AoU.tsv.gz"                "${OUT_AOU}/Asthma_AoU.cleaned.txt"                "${LOG_AOU}/Asthma_AoU.log"
 run_aou "${AOU_IN_DIR}/Basophil_percentage_AoU.tsv.gz"   "${OUT_AOU}/Basophil_percentage_AoU.cleaned.txt"   "${LOG_AOU}/Basophil_percentage_AoU.log"
 run_aou "${AOU_IN_DIR}/BMI_AoU.tsv.gz"                   "${OUT_AOU}/BMI_AoU.cleaned.txt"                   "${LOG_AOU}/BMI_AoU.log"
@@ -74,7 +74,7 @@ run_aou "${AOU_IN_DIR}/Type_1_diabetes_AoU.tsv.gz"       "${OUT_AOU}/Type_1_diab
 run_aou "${AOU_IN_DIR}/Type_2_diabetes_AoU.tsv.gz"       "${OUT_AOU}/Type_2_diabetes_AoU.cleaned.txt"       "${LOG_AOU}/Type_2_diabetes_AoU.log"
 run_aou "${AOU_IN_DIR}/Weight_AoU.tsv.gz"                "${OUT_AOU}/Weight_AoU.cleaned.txt"                "${LOG_AOU}/Weight_AoU.log"
 
-FG_IN_DIR="/stor/work/Kirkpatrick/scratch/Jared/signbias/data/GWAS/FinnGen/R12"
+FG_IN_DIR="/GWAS/FG"
 run_fg "${FG_IN_DIR}/finngen_R12_F5_SCHZPHR.tsv.gz"          "${OUT_FG}/finngen_R12_F5_SCHZPHR.cleaned.txt"          "${LOG_FG}/finngen_R12_F5_SCHZPHR.log"
 run_fg "${FG_IN_DIR}/finngen_R12_G6_ALZHEIMER.tsv.gz"        "${OUT_FG}/finngen_R12_G6_ALZHEIMER.cleaned.txt"        "${LOG_FG}/finngen_R12_G6_ALZHEIMER.log"
 run_fg "${FG_IN_DIR}/finngen_R12_J10_ASTHMA_EXMORE.tsv.gz"   "${OUT_FG}/finngen_R12_J10_ASTHMA_EXMORE.cleaned.txt"   "${LOG_FG}/finngen_R12_J10_ASTHMA_EXMORE.log"
