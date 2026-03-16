@@ -2,14 +2,14 @@
 ### Run all binning and MAF bin alculations
 
 RSCRIPT="${RSCRIPT:-Rscript}"
-SCRIPT="7-3_Bin_and_Calc_sign_bias.R"
+SCRIPT="/scripts/7-3_Bin_and_Calc_sign_bias.R"
 
-# Where ASH outputs live (input files for bin/threshold)
+# ash out dirs
 UKB_ASH="/UKB/ash_out"
 AOU_ASH="/AoU/ash_out"
 FG_ASH="/FG/ash_out"
 
-# Output
+# output
 OUT_BASE="/binned_out/"
 mkdir -p "$OUT_BASE"/{UKB,AOU,FG}/{bin,threshold,logs}
 

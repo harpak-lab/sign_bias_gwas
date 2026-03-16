@@ -9,7 +9,7 @@ library("ashr")
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
-  stop("Usage: Rscript run_ash.R <cleaned_gwas_file> <out_file>\nExample: Rscript run_ash.R cleaned_gwas/asthma.cleaned.txt ash_out/asthma.minor_results.txt")
+  stop("too few args")
 }
 
 in_file  <- args[1]

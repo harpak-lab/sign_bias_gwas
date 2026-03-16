@@ -2,6 +2,7 @@
 ## AoU phenotype/sample QC  
 ############################################################
 
+#load library
 library(data.table)
 
 bucket <- Sys.getenv("WORKSPACE_BUCKET")
@@ -10,25 +11,27 @@ stopifnot(nzchar(bucket))
 PHENO_DIR <- "phenos"
 dir.create(PHENO_DIR, showWarnings = FALSE, recursive = TRUE)
 
+#copy function
 gs_cp <- function(src, dest = ".") {
   system2("gsutil", c("-m", "cp", src, dest))
 }
 
 trim_id <- function(x) trimws(as.character(x))
 
+#calculate moments
 calc_central_moments <- function(x) {
   x <- x[!is.na(x)]
   n <- length(x)
-  if (n == 0L) return(c(mu0=NA_real_, mu1=NA_real_, mu2=NA_real_, mu3=NA_real_, mu3_std=NA_real_))
+  if (n == 0) return(c(mu0=NA, mu1=NA, mu2=NA, mu3=NA, mu3_std=NA))
   m  <- mean(x)
   xc <- x - m
   mu2 <- mean(xc^2)
   mu3 <- mean(xc^3)
-  skew <- if (is.finite(mu2) && mu2 > 0) mu3 / (mu2^(3/2)) else NA_real_
+  skew <- if (is.finite(mu2) && mu2 > 0) mu3 / (mu2^(3/2)) else NA
   c(mu0=1, mu1=0, mu2=mu2, mu3=mu3, mu3_std=skew)
 }
 
-# Writes person_id/value phenotype
+# write person_id/value phenotype
 write_pheno <- function(DT, id_col, val_col, keep_ids, out) {
   tmp <- DT[, .(person_id = get(id_col), value = get(val_col))]
   tmp[, person_id := trim_id(person_id)]
@@ -37,7 +40,7 @@ write_pheno <- function(DT, id_col, val_col, keep_ids, out) {
   invisible(tmp)
 }
 
-# Writes PLINK phenotype: FID IID PHENO
+# writes PLINK phenotype: FID IID PHENO
 write_pheno_plink <- function(pheno_dt, out_plink) {
   stopifnot(all(c("person_id","value") %in% names(pheno_dt)))
   pl <- pheno_dt[, .(FID = person_id, IID = person_id, PHENO = value)]
@@ -50,7 +53,7 @@ center_covariates <- function(cov_dt, id_col = "person_id") {
   covc <- copy(cov_dt)
   num_cols <- names(covc)[vapply(covc, is.numeric, logical(1L))]
   num_cols <- setdiff(num_cols, id_col)
-  if (length(num_cols) == 0L) return(covc)
+  if (length(num_cols) == 0) return(covc)
 
   means <- covc[, lapply(.SD, mean, na.rm = TRUE), .SDcols = num_cols]
   for (j in num_cols) {
@@ -58,7 +61,6 @@ center_covariates <- function(cov_dt, id_col = "person_id") {
   }
   covc
 }
-
 
 ## Download inputs
 remote_files <- paste0(bucket, "/", c(
@@ -68,42 +70,47 @@ remote_files <- paste0(bucket, "/", c(
   "aou_gwas/participant_PCs.csv",
   "aou_gwas/samples_relatedness_flagged_samples.tsv",
   "aou_gwas/aou.v8.classified-rf.wb-classify.report-any.fam",
-  "aou_gwas/pheno/lab_measures_wbc.tsv",
+  "aou_gwas/pheno/lab_measures_all_v2.tsv",
   "aou_gwas/pheno/physical_measures_hwb.tsv"
 ))
 gs_cp(remote_files, ".")
 
-## Build binary phenos subset
+## build binary phenos subset
 bin_cols <- c("person_id", "sex", "RE_475","EM_202.1",
   "EM_202.2","MB_287.1","NS_328.11")
 binary_table <- fread("mcc2_phecodex_table_v8.csv", select = bin_cols)
 binary_table[, person_id := trim_id(person_id)]
 fwrite(binary_table, file.path(PHENO_DIR, "binary_phenos.csv"))
 
+## read other inputs
 
-## Read other inputs
+#demographics
 demo_table <- fread("demographics_table.csv", select = 1:3)
 setnames(demo_table, c("person_id","age","sex"))
 demo_table[, person_id := trim_id(person_id)]
 
+#PCs
 pcs <- fread("participant_PCs.csv", select = c(1, 5:20))
 pcs[, person_id := trim_id(person_id)]
 
+#relatedness QC
 relatedness <- fread("samples_relatedness_flagged_samples.tsv", header = FALSE)
 setnames(relatedness, "person_id")
 relatedness[, person_id := trim_id(person_id)]
 
+#White british classified sample IDs
 wb_fam <- fread("aou.v8.classified-rf.wb-classify.report-any.fam", header = FALSE)
 wb_ukb_samples <- wb_fam[, .(person_id = trim_id(V2))]
 
+#physical measures
 physical <- fread("physical_measures_hwb.tsv", sep = "\t")
 physical[, person_id := trim_id(person_id)]
 
-lab_wb <- fread("lab_measures_wbc.tsv", sep = "\t")
+#lab measurements
+lab_wb <- fread("lab_measures_all_v2.tsv", sep = "\t")
 lab_wb[, person_id := trim_id(person_id)]
 
-
-## Sample QC: unrelated IDs
+## sample QC: unrelated IDs
 related_ids <- unique(relatedness[!is.na(person_id), person_id])
 wb_ids      <- unique(wb_ukb_samples[!is.na(person_id), person_id])
 unrelated_ids <- setdiff(wb_ids, related_ids)
@@ -112,8 +119,7 @@ unrelated_ids <- setdiff(wb_ids, related_ids)
 wb_ukb_plink <- data.table(`#IID` = unrelated_ids)
 fwrite(wb_ukb_plink, "wb_samples_filtered.txt", sep = "\t")
 
-
-## Covariates (centered)
+## covariates (centered)
 covariates <- merge(demo_table, pcs, by = "person_id", all = FALSE)
 covariates <- covariates[sex %chin% c("Male","Female") & person_id %chin% unrelated_ids]
 
@@ -126,8 +132,6 @@ covariates[, `:=`(
 
 cov_centered <- center_covariates(covariates, id_col = "person_id")
 fwrite(cov_centered, file.path(PHENO_DIR, "aou_covariates.centered.tsv"), sep = "\t")
-
-
 
 ## Pheno QC: write to phenos
 phys_specs <- list(
@@ -145,9 +149,12 @@ for (nm in names(phys_specs)) {
 
 # Lab
 lab_map <- c(
-  monocyte_percentage    = file.path(PHENO_DIR, "aou_monocyte_percentage.tsv"),
-  basophil_percentage    = file.path(PHENO_DIR, "aou_basophil_percentage.tsv"),
-  neutrophil_percentage  = file.path(PHENO_DIR, "aou_neutrophil_percentage.tsv")
+  monocyte_percentage           = file.path(PHENO_DIR, "aou_monocyte_percentage.tsv"),
+  basophil_percentage           = file.path(PHENO_DIR, "aou_basophil_percentage.tsv"),
+  neutrophil_percentage         = file.path(PHENO_DIR, "aou_neutrophil_percentage.tsv"),
+  white_blood_cell_count        = file.path(PHENO_DIR, "aou_white_blood_cell_count.tsv"),
+  red_blood_cell_count          = file.path(PHENO_DIR, "aou_red_blood_cell_count.tsv"),
+  mean_corpuscular_hemoglobin   = file.path(PHENO_DIR, "aou_mean_corpuscular_hemoglobin.tsv")
 )
 
 lab_out <- list()
@@ -183,17 +190,20 @@ for (nm in names(bin_specs)) {
 
 ## Moments (write to phenos)
 trait_vectors <- list(
-  "Height"                 = phys_out$height$value,
-  "Weight"                 = phys_out$weight$value,
-  "BMI"                    = phys_out$bmi$value,
-  "Monocyte percentage"    = lab_out$monocyte_percentage$value,
-  "Basophil percentage"    = lab_out$basophil_percentage$value,
-  "Neutrophil percentage"  = lab_out$neutrophil_percentage$value,
-  "Asthma"                 = bin_out$asthma$value,
-  "Type 1 diabetes"        = bin_out$t1d$value,
-  "Type 2 diabetes"        = bin_out$t2d$value,
-  "Schizophrenia"          = bin_out$schizophrenia$value,
-  "Alzheimer's disease"    = bin_out$alzheimers$value
+  "Height"                        = phys_out$height$value,
+  "Weight"                        = phys_out$weight$value,
+  "BMI"                           = phys_out$bmi$value,
+  "Monocyte percentage"           = lab_out$monocyte_percentage$value,
+  "Basophil percentage"           = lab_out$basophil_percentage$value,
+  "Neutrophil percentage"         = lab_out$neutrophil_percentage$value,
+  "White blood cell count"        = lab_out$white_blood_cell_count$value,
+  "Red blood cell count"          = lab_out$red_blood_cell_count$value,
+  "Mean corpuscular hemoglobin"   = lab_out$mean_corpuscular_hemoglobin$value,
+  "Asthma"                        = bin_out$asthma$value,
+  "Type 1 diabetes"               = bin_out$t1d$value,
+  "Type 2 diabetes"               = bin_out$t2d$value,
+  "Schizophrenia"                 = bin_out$schizophrenia$value,
+  "Alzheimer's disease"           = bin_out$alzheimers$value
 )
 
 aou_moments <- rbindlist(lapply(names(trait_vectors), function(tr) {
@@ -217,12 +227,18 @@ out_bucket_map <- list(
   file.path(PHENO_DIR, "aou_bmi.tsv")                 = paste0(bucket, "/aou_gwas/pheno/"),
   file.path(PHENO_DIR, "aou_bmi.plink.tsv")           = paste0(bucket, "/aou_gwas/pheno/"),
 
-  file.path(PHENO_DIR, "aou_monocyte_percentage.tsv")       = paste0(bucket, "/aou_gwas/pheno/"),
-  file.path(PHENO_DIR, "aou_monocyte_percentage.plink.tsv") = paste0(bucket, "/aou_gwas/pheno/"),
-  file.path(PHENO_DIR, "aou_basophil_percentage.tsv")       = paste0(bucket, "/aou_gwas/pheno/"),
-  file.path(PHENO_DIR, "aou_basophil_percentage.plink.tsv") = paste0(bucket, "/aou_gwas/pheno/"),
-  file.path(PHENO_DIR, "aou_neutrophil_percentage.tsv")     = paste0(bucket, "/aou_gwas/pheno/"),
-  file.path(PHENO_DIR, "aou_neutrophil_percentage.plink.tsv") = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_monocyte_percentage.tsv")         = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_monocyte_percentage.plink.tsv")   = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_basophil_percentage.tsv")         = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_basophil_percentage.plink.tsv")   = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_neutrophil_percentage.tsv")       = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_neutrophil_percentage.plink.tsv")       = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_white_blood_cell_count.tsv")            = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_white_blood_cell_count.plink.tsv")      = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_red_blood_cell_count.tsv")              = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_red_blood_cell_count.plink.tsv")        = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_mean_corpuscular_hemoglobin.tsv")       = paste0(bucket, "/aou_gwas/pheno/"),
+  file.path(PHENO_DIR, "aou_mean_corpuscular_hemoglobin.plink.tsv") = paste0(bucket, "/aou_gwas/pheno/"),
 
   file.path(PHENO_DIR, "aou_asthma.tsv")              = paste0(bucket, "/aou_gwas/pheno/"),
   file.path(PHENO_DIR, "aou_asthma.plink.tsv")        = paste0(bucket, "/aou_gwas/pheno/"),

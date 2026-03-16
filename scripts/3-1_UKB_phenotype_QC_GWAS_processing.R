@@ -1,17 +1,17 @@
-##############################################################
-## UKB Sample QC / Covariates / Prepare phenotypes for GWAS ##
-##############################################################
+##########################################################
+## Sample QC / Covariates / Prepare phenotypes for GWAS ##
+##########################################################
 
 #libraries/wd
 library(dplyr)
 library(data.table)
-setwd("/ukb_phenos/")
+setwd("ukb_group_gwas/phenos/")
 
 ukb      <- fread("UKB.phenos.all.csv")
 ukb_qc   <- fread("UKB.qc.csv")
 ukb      <- merge(ukb, ukb_qc, by = "eid")
 
-gen_samples <- fread("ukb61666_imp_chr1_v3_s487280.sample", #sample list
+gen_samples <- fread("ukb61666_imp_chr1_v3_s487280.sample", 
   sep = " ")
 gen_samples <- gen_samples[-1, ]
 
@@ -89,7 +89,6 @@ ukb[, in_Phasing_Input_chrXY :=
 # Genetic White British ancestry subset (UKB genetic group 1)
 ukb[, in_white_British_ancestry_subset :=
       fifelse(`22006-0.0` == 1, TRUE, FALSE, na = FALSE)]
-
 
 ## Age/ancestry flags
 
@@ -219,8 +218,6 @@ fwrite(
   quote     = FALSE
 )
 
-
-
 ################## Build binary/quant phenotypes #################
 
 ukb_binary <- as.data.table(ukb_final)
@@ -249,6 +246,9 @@ icd_main_long[, icd3 := substr(icd10_raw, 1, 3)]
 # Alzheimer's disease (G6_ALZHEIMER): any G30* in main ICD10
 ad_ids <- icd_main_long[icd3 == "G30", unique(eid)]
 
+# Asthma (J45_ASTHMA): any G30* in main ICD10
+ast_ids <- icd_main_long[icd3 == "J45", unique(eid)]
+
 # Type 1 diabetes (E4_DM1): any E10* in main ICD10
 t1d_ids <- icd_main_long[icd3 == "E10", unique(eid)]
 
@@ -263,20 +263,12 @@ scz_ids <- icd_main_long[icd3 == "F20", unique(eid)]
 
 ## Attach binary phenotypes 
 ukb_binary[, AD  := as.integer(eid %in% ad_ids)]
+ukb_binary[, ASTHMA  := as.integer(eid %in% ast_ids)]
 ukb_binary[, T1D := as.integer(eid %in% t1d_ids)]
 ukb_binary[, T2D := as.integer(eid %in% t2d_ids)]
 ukb_binary[, SCZ := as.integer(eid %in% scz_ids)]
 
-## ASTHMA FROM FIELD 22127-0.0 
-ukb_binary[, asthma_raw := as.numeric(`22127-0.0`)]
-
-ukb_binary[, ASTHMA := fifelse(
-  asthma_raw == 1, 1L,                                   # case
-  fifelse(asthma_raw == 0, 0L, NA)                       # control vs missing
-)]
-
 ##  counts
-
 summary_counts <- rbindlist(list(
   ukb_binary[, .(trait = "AD",
          n_total    = .N,
@@ -300,8 +292,10 @@ summary_counts <- rbindlist(list(
                  n_controls = sum(ASTHMA == 0, na.rm = TRUE))]
 ), use.names = TRUE)
 
-summary_counts$neale_cases <- c(119,583,888,198,11710)
-summary_counts$neale_controls <- c(361075,360611,360306,360996,80070)
+summary_counts$neale_cases <- c(119,583,888,
+  198,1693)
+summary_counts$neale_controls <- c(361075,360611,360306,
+  360996,359501)
 
 
 print(summary_counts)
@@ -319,14 +313,17 @@ quant_map <- c(
   weight    = "21002-0.0",  # weight
   mono_pct  = "30190-0.0",  # monocyte %
   neutro_pct= "30200-0.0",  # neutrophil %
-  baso_pct  = "30220-0.0"   # basophil %
+  baso_pct  = "30220-0.0",   # basophil %
+  wbc = "30000-0.0", # white blood cell count
+  rbc = "30010-0.0", # red blood cell count
+  mch = "30050-0.0" # mean corpuscular hemoglobin
 )
 
 for (new_name in names(quant_map)) {
   old_col <- quant_map[[new_name]]
   if (!old_col %in% names(ukb_quant)) {
     warning(sprintf("Column %s not found in ukb_final; %s will be NA.", old_col, new_name))
-    ukb_quant[, (new_name) := NA]
+    ukb_quant[, (new_name) := NA_real_]
   } else {
     ukb_quant[, (new_name) := as.numeric(get(old_col))]
   }
@@ -352,7 +349,8 @@ ukb_final[, (binary_traits) := lapply(.SD, function(x) {
 pheno_cols <- c(
   "AD", "T1D", "T2D", "SCZ", "ASTHMA",       # binary
   "height", "bmi", "weight",                # quantitative
-  "mono_pct", "neutro_pct", "baso_pct"      # blood percentages
+  "mono_pct", "neutro_pct", "baso_pct",     # blood percentages
+  "wbc", "rbc", "mch"
 )
 
 # Construct PLINK table
@@ -378,100 +376,6 @@ fwrite(
   quote = FALSE,
   na = "NA")
 
-################## Trait moments  #################
-
-# Central moments about the mean:
-# mu0 = 1
-# mu1 = E[(X-mean)^1]  ~ 0
-# mu2 = E[(X-mean)^2]  = variance
-# mu3 = E[(X-mean)^3]
-# mu3_std = mu3 / mu2^(3/2)  (skewness)
-
-central_moments <- function(x) {
-  x <- as.numeric(x)
-  x <- x[is.finite(x)]
-  m <- mean(x)
-  xc <- x - m
-  mu2 <- mean(xc^2)
-  mu3 <- mean(xc^3)
-  data.table(
-    mu0 = 1,
-    mu1 = mean(xc),  # ~ 0 (floating error may show ~1e-15)
-    mu2 = mu2,
-    mu3 = mu3,
-    mu3_std = if (is.finite(mu2) && mu2 > 0) mu3 / (mu2^(3/2)) else NA
-  )
-}
-
-
-# Quantitative
-quant_out_map <- c(
-  height  = "height",
-  weight = "weight",
-  BMI   = "bmi",
-  monocyte_pct = "mono_pct",
-  basophil_pct = "baso_pct",
-  neutrophil_pct= "neutro_pct"
-)
-
-mom_quant <- rbindlist(lapply(names(quant_out_map), function(tr) {
-  col <- quant_out_map[[tr]]
-  if (!col %in% names(ukb_final)) {
-    data.table(trait = tr, mu0 = 1, mu1 = NA, 
-      mu2 = NA, mu3 = NA, mu3_std = NA)
-  } else {
-    cbind(data.table(trait = tr), central_moments(ukb_final[[col]]))
-  }
-}), use.names = TRUE, fill = TRUE)
-
-# Binary (case/control from Neale)
-bin_counts <- data.table(
-  trait    = c("alzheimers", 
-    "asthma", "schizophrenia", 
-    "type_1_diabetes", "type_2_diabetes"),
-  cases    = c(119,          
-    11717,    198,           
-    583,              
-    888),
-  controls = c(361075,       
-    80070,    
-    360996,         
-    360611,           
-    360306)
-)
-
-# For Bernoulli(p)
-mom_bin <- bin_counts[, {
-  n  <- cases + controls
-  p  <- cases / n
-  mu2 <- p * (1 - p)
-  mu3 <- mu2 * (1 - 2 * p)
-  list(
-    mu0 = 1,
-    mu1 = 0,  # exactly 0 for central moment 1
-    mu2 = mu2,
-    mu3 = mu3,
-    mu3_std = ifelse(mu2 > 0, mu3 / (mu2^(3/2)), NA)
-  )
-}, by = trait]
-
-## combine
-moments_all <- rbindlist(list(mom_quant, mom_bin), use.names = TRUE, 
-  fill = TRUE)
-moments_all <- moments_all[
-  match(c("height","weight","BMI","monocyte_pct",
-    "basophil_pct","neutrophil_pct",
-          "type_1_diabetes","type_2_diabetes",
-          "schizophrenia","asthma","alzheimers"),
-        trait)
-]
-
-# Save
-fwrite(moments_all, file = "ukb_moments_1.tsv", sep = "\t", 
-  quote = FALSE)
-
-
-
 ################## Split QC samples #################
 qc<- keep_qc
 
@@ -485,8 +389,9 @@ n <- nrow(qc)
 qc[, split2 := ifelse(1:.N <= n/2, 1L, 2L)]
 
 table(qc$split2)
+# should be roughly n/2, n/2
 
-# write out two split files
+# write out two split files, preserving original columns
 orig_cols <- setdiff(names(qc), "split2")
 
 qc_split1 <- qc[split2 == 1L, ..orig_cols]
@@ -497,22 +402,54 @@ fwrite(qc_split1, "ukb_samples_group1.txt",
 fwrite(qc_split2, "ukb_samples_group2.txt",
        sep = "\t", col.names = TRUE, quote = FALSE)
 
+### Split into 3
+qc <- keep_qc
+
+# Add a random number and sort
+qc[, rand := runif(.N)]
+setorder(qc, rand)
+qc[, rand := NULL]
+
+# Assign rows to 3 groups: 1, 2, 3 (roughly equal sizes)
+n <- nrow(qc)
+qc[, split3 := ((1:.N - 1L) %% 3L) + 1L]
+
+table(qc$split3)
+# should be roughly n/3 in each of 1, 2, 3
+
+# Write out three split files, preserving original columns
+orig_cols <- setdiff(names(qc), "split3")
+
+qc_split1 <- qc[split3 == 1L, ..orig_cols]
+qc_split2 <- qc[split3 == 2L, ..orig_cols]
+qc_split3 <- qc[split3 == 3L, ..orig_cols]
+
+fwrite(qc_split1, "ukb_samples_smallgroup1.txt",
+       sep = "\t", col.names = TRUE, quote = FALSE)
+fwrite(qc_split2, "ukb_samples_smallgroup2.txt",
+       sep = "\t", col.names = TRUE, quote = FALSE)
+fwrite(qc_split3, "ukb_samples_smallgroup3.txt",
+       sep = "\t", col.names = TRUE, quote = FALSE)
 
 ################## 
 
-# Binary traits in ukb_final
+# Binary traits in ukb_final (already recoded: 0->2, 1->3)
 binary_traits <- c("AD", "T1D", "T2D", "SCZ", "ASTHMA")
 
+# Helper: summarize one split
 summarize_split <- function(keep_file, split_label) {
   # Read keep file: FID / IID (IID = eid)
   ids <- fread(keep_file)
   
+  # Make an 'eid' column to join on
   if (!"eid" %in% names(ids)) {
     ids[, eid := IID]
   }
   
+  # Restrict ukb_final to this split
   split_dt <- ukb_final[eid %in% ids$eid]
   
+  # Build summary for each binary trait
   rbindlist(lapply(binary_traits, function(tr) {
     v <- split_dt[[tr]]
     data.table(
@@ -526,10 +463,13 @@ summarize_split <- function(keep_file, split_label) {
   }))
 }
 
-# Collect summaries
+# Collect summaries for all 5 splits
 summary_splits <- rbindlist(list(
   summarize_split("ukb_samples_group1.txt",       "big_group1"),
-  summarize_split("ukb_samples_group2.txt",       "big_group2")
+  summarize_split("ukb_samples_group2.txt",       "big_group2"),
+  summarize_split("ukb_samples_smallgroup1.txt",  "small_group1"),
+  summarize_split("ukb_samples_smallgroup2.txt",  "small_group2"),
+  summarize_split("ukb_samples_smallgroup3.txt",  "small_group3")
 ), use.names = TRUE)
 
 print(summary_splits)

@@ -1,8 +1,6 @@
 #!/bin/bash
-## Collect phenotype files, covariates, and run GWAS (plink 2.0)
-########
 
-## Set up directories
+#DIRs
 PHENO_DIR="${PHENO_DIR:-phenos}"
 COVAR_IN="${COVAR_IN:-${PHENO_DIR}/aou_covariates.centered.tsv}"
 COVAR_PLINK="${COVAR_PLINK:-${PHENO_DIR}/aou_covariates.centered.plink.tsv}"
@@ -10,13 +8,11 @@ COVAR_PLINK="${COVAR_PLINK:-${PHENO_DIR}/aou_covariates.centered.plink.tsv}"
 GENO_BASE="${GENO_BASE:-plink}"
 OUT_BASE="${OUT_BASE:-gwas_out}"
 THREADS="${THREADS:-8}"
+MAX_PARALLEL_TRAITS="${MAX_PARALLEL_TRAITS:-5}" #run max 5 traits in parallel 
 
-# Recode binary phenotypes (so --glm runs linear regression)
 RECODE_BINARY_TO_34="${RECODE_BINARY_TO_34:-1}"
 
-# Format covariate file 
 if [[ ! -f "$COVAR_PLINK" ]]; then
-  echo "Creating PLINK covariate file: $COVAR_PLINK"
   awk -F'\t' -v OFS='\t' '
     NR==1{
       printf "FID\tIID";
@@ -33,31 +29,35 @@ if [[ ! -f "$COVAR_PLINK" ]]; then
   ' "$COVAR_IN" > "$COVAR_PLINK"
 fi
 
-# Phenotype files
+#phenotypes
 mapfile -t PHENO_FILES < <(find "$PHENO_DIR" -maxdepth 1 -type f -name "aou_*.plink.tsv" ! -name "*covariates*" | sort)
-if [[ "${#PHENO_FILES[@]}" -eq 0 ]]; then
-  echo "no matching ${PHENO_DIR}/aou_*.plink.tsv" >&2
-  exit 2
-fi
 
-# Chromosome prefix
 pick_prefix () {
   local chr="$1"
   local p1="${GENO_BASE}/chr${chr}.filtered"
   local p2="${GENO_BASE}/chr${chr}/chr${chr}.filtered"
+
+  if [[ -f "${p1}.pgen" || -f "${p1}.bed" ]]; then
+    echo "$p1"
+    return 0
+  elif [[ -f "${p2}.pgen" || -f "${p2}.bed" ]]; then
+    echo "$p2"
+    return 0
+  fi
   return 1
 }
 
-# Recode binary to run linreg
+
+#recode binrary to run linreg
 maybe_recode_pheno_to_34 () {
   local pheno_file="$1"
   local trait="$2"
 
   if [[ "$RECODE_BINARY_TO_34" -ne 1 ]]; then
-    echo "$pheno_file"; return 0
+    echo "$pheno_file"
+    return 0
   fi
 
-  # Detect if all non-missing PHENO values
   if awk -F'\t' '
       NR==1{next}
       $3=="" || $3=="NA" || $3=="." {next}
@@ -86,7 +86,6 @@ maybe_recode_pheno_to_34 () {
         }
       ' "$pheno_file" > "$tmpfile"
     else
-    
       awk -F'\t' -v OFS='\t' '
         NR==1{print; next}
         {
@@ -97,40 +96,66 @@ maybe_recode_pheno_to_34 () {
       ' "$pheno_file" > "$tmpfile"
     fi
 
-    echo "$tmpfile"; return 0
+    echo "$tmpfile"
+    return 0
   else
-    echo "$pheno_file"; return 0
+    echo "$pheno_file"
+    return 0
   fi
 }
 
-for chr in $(seq 1 22); do
-  if ! prefix="$(pick_prefix "$chr")"; then
-    echo "WARN: (skipping chr${chr})"
-    continue
-  fi
+# map phenotype basename to outnames
+merged_trait_name () {
+  local trait="$1"
+  case "$trait" in
+    alzheimers) echo "Alzheimers_AoU" ;;
+    asthma) echo "Asthma_AoU" ;;
+    basophil_percentage) echo "Basophil_percentage_AoU" ;;
+    bmi) echo "BMI_AoU" ;;
+    height) echo "Height_AoU" ;;
+    monocyte_percentage) echo "Monocyte_percentage_AoU" ;;
+    neutrophil_percentage) echo "Neutrophil_percentage_AoU" ;;
+    white_blood_cell_count) echo "White_blood_cell_count_AoU" ;;
+    red_blood_cell_count) echo "Red_blood_cell_count_AoU" ;;
+    mean_corpuscular_hemoglobin) echo "Mean_corpuscular_hemoglobin_AoU" ;;
+    schizophrenia) echo "Schizophrenia_AoU" ;;
+    t1d) echo "Type_1_diabetes_AoU" ;;
+    t2d) echo "Type_2_diabetes_AoU" ;;
+    weight) echo "Weight_AoU" ;;
+    *)
+      echo "${trait}_AoU"
+      ;;
+  esac
+}
 
-  if [[ -f "${prefix}.pgen" ]]; then
-    INFLAG="--pfile"
-  elif [[ -f "${prefix}.bed" ]]; then
-    INFLAG="--bfile"
-  else
-    echo "(skipping)"
-    continue
-  fi
+mkdir -p "${OUT_BASE}/logs"
 
-  for pf in "${PHENO_FILES[@]}"; do
-    bn="$(basename "$pf")"
-    trait="${bn#aou_}"
-    trait="${trait%.plink.tsv}"
+run_trait_gwas () {
+  local pf="$1"
 
-    outdir="${OUT_BASE}/${trait}"
-    mkdir -p "$outdir"
+  local bn trait outdir pheno_use outprefix logfile prefix INFLAG chr
+  bn="$(basename "$pf")"
+  trait="${bn#aou_}"
+  trait="${trait%.plink.tsv}"
 
-    pheno_use="$(maybe_recode_pheno_to_34 "$pf" "$trait")"
+  outdir="${OUT_BASE}/${trait}"
+  mkdir -p "$outdir"
+
+  pheno_use="$(maybe_recode_pheno_to_34 "$pf" "$trait")"
+
+  for chr in $(seq 1 22); do
+    prefix="$(pick_prefix "$chr")" || continue
+
+    if [[ -f "${prefix}.pgen" ]]; then
+      INFLAG="--pfile"
+    elif [[ -f "${prefix}.bed" ]]; then
+      INFLAG="--bfile"
+    else
+      continue
+    fi
+
     outprefix="${outdir}/chr${chr}"
     logfile="${OUT_BASE}/logs/${trait}.chr${chr}.log"
-
-    echo "chr${chr} trait=${trait} input=${prefix} pheno=$(basename "$pheno_use")"
 
     plink2 \
       ${INFLAG} "${prefix}" \
@@ -138,11 +163,31 @@ for chr in $(seq 1 22); do
       --covar "${COVAR_PLINK}" \
       --covar-variance-standardize \
       --glm hide-covar omit-ref \
+      --vif 80 \
       --threads "${THREADS}" \
       --out "${outprefix}" \
       > "${logfile}" 2>&1
   done
+
+  trait_dir="${OUT_BASE}/${trait}"
+
+  mapfile -t chr_files < <(
+    find "${trait_dir}" -maxdepth 1 -type f -name "chr*.glm.linear" | sort -V
+  )
+
+  merged_name="$(merged_trait_name "$trait")"
+  tmpfile="${OUT_BASE}/${merged_name}.tsv"
+
+  awk 'FNR==1 && NR!=1 {next} {print}' "${chr_files[@]}" > "${tmpfile}"
+  gzip -f "${tmpfile}"
+}
+
+for pf in "${PHENO_FILES[@]}"; do
+  while [ "$(jobs -r | wc -l)" -ge "$MAX_PARALLEL_TRAITS" ]; do
+    sleep 2
+  done
+
+  run_trait_gwas "$pf" &
 done
 
-echo
-echo "Done."
+wait

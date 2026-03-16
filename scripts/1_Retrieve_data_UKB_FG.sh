@@ -1,6 +1,7 @@
 #!/bin/bash
+
 ############# Get UKB phenotype data and GWAS summmary statistics 
-############# (UKB and FinnGen), AoU data queried from Workbench
+#(UKB and FinnGen), AoU data queried from Workbench
 
 ############# Query UKB phenotype data 
 ## 31 = reported sex
@@ -19,11 +20,12 @@
 ## 22023 = Y intensity
 ## 22024 = DNA concentration
 ## 22025 = Cluster.CR
-## 22026 = dQC
+## 22026 = Affymetrix quality control metric "dQC"
 ## 22027 = outliers for het/missing
 ## 22028 = use in phasing chr1-22
 ## 22029 = use in phasing chrX
 ## 22030  = use in phasing chrXY
+## 22009  = genetic PCs
 
 ## 50 = standing height
 ## 21001 = BMI
@@ -31,12 +33,15 @@
 ## 30190 = monocyte percentage
 ## 30200 = neutrophill percentage
 ## 30220 = basophil percentage
-## 22127 = asthma
+## 41202 = main ICD10 diagnoses
 ## 40001 = underlying (primary) cause of death (IDC10)
 ## 40002 = contributory (secondary) causes of death
 ## 41270 = diagnoses - ICD10
+## 30000 = white blood cell count
+## 30010 = red blood cell count
+## 30050 = mean corpuscular haemoglobin
 
-cat <<EOF >> pheno_fields_ukb.txt
+cat <<EOF >> qc_fields_ukb.txt
 31 
 21000 
 21022 
@@ -56,43 +61,60 @@ cat <<EOF >> pheno_fields_ukb.txt
 22026 
 22027 
 22028 
-20029
+22029
 22030
+22009
 EOF
 
-cat <<EOF >> qc_fields_ukb.txt
+cat <<EOF >> pheno_fields_ukb.txt
 50
 21001
 21002
 30190
 30200
 30220
-22127 
+41202
 40001
 40002
 41270
+30000
+30010
+30050
 EOF
 
 # Get indicated phenotype values
-./ukbconv ukb677255.enc_ukb csv -ipheno_fields_ukb.txt -oUKB.phenos.all.csv
-./ukbconv ukb677255.enc_ukb csv -iqc_fields_ukb.txt -oUKB.qc.csv
+./ukbconv ukb677255.enc_ukb csv -ipheno_fields_ukb.txt -oUKB.phenos.all
+./ukbconv ukb677255.enc_ukb csv -iqc_fields_ukb.txt -oUKB.qc
 
 # Get UKB GWAS variant files (Neale)
-wget wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/annotations/variants.tsv.bgz -O Neale.variants.tsv
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/annotations/variants.tsv.bgz -O Neale.variants.tsv
 
 # Get UKB GWAS summary statistics (raw units)
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/50_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.height.tsv.bgz 
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21001_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.BMI.tsv.bgz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21002_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.weight.tsv.bgz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30190_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.monocyte_pct.tsv.bgz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30200_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.neutrophil_pct.tsv.bgz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30220_raw.gwas.imputed_v3.both_sexes.tsv.bgz?dl=0 -O Neale.basophil_pct.tsv.bgz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/E4_DM1.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.T1D.tsv.gz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/E4_DM2.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.T2D.tsv.gz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/22127.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.asthma.tsv.gz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/F20.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.schizophrenia.tsv.gz
-wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/AD.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.AD.tsv.gz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/50_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.height.tsv.bgz 
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21001_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.BMI.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21002_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.weight.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30190_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.monocyte_percentage.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30200_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.neutrophil_percentage.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30220_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.basophil_percentage.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30000_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.white_blood_cell_count.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30010_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.red_blood_cell_count.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30050_raw.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.mean_corpuscular_hemoglobin.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/J45.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.asthma_J45.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/E4_DM1.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.type1_diabetes.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/E4_DM2.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.type2_diabetes.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/F20.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.schizophrenia_ICD10.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/AD.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.AD.tsv.bgz
 
+# Get UKB GWAS summary statistics (transformed; irnt)
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/50_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.height.irnt.tsv.bgz 
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21001_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.BMI.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/21002_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.weight.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30190_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.monocyte_percentage.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30200_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.neutrophil_percentage.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30220_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.basophil_percentage.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30000_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.white_blood_cell_count.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30010_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.red_blood_cell_count.irnt.tsv.bgz
+wget https://broad-ukb-sumstats-us-east-1.s3.amazonaws.com/round2/additive-tsvs/30050_irnt.gwas.imputed_v3.both_sexes.tsv.bgz -O Neale.mean_corpuscular_hemoglobin.irnt.tsv.bgz
 
 ############ Retrieve FinnGen GWAS summary statistics (r12; google cloud platform)
 wget https://storage.googleapis.com/finngen-public-data-r12/summary_stats/release/finngen_R12_T1D.gz

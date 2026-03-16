@@ -1,5 +1,5 @@
-## Clean UKB 
-GWAS 
+## Clean UKB GWAS
+
 #Remove scientific notation
 options(scipen = 999)  
 options(warn=1)

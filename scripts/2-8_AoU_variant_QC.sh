@@ -32,6 +32,7 @@ for chr in "${CHROMS[@]}"; do
       --keep "$(realpath "$KEEP_FILE")" \
       --hwe 1e-12 midp keep-fewhet \
       --geno 0.05 \
+      --extract rsids_from_ukb_list.txt \
       --make-bed \
       --out "chr${chr}.filtered" \
       --allow-extra-chr

@@ -18,11 +18,12 @@ CHR=${SLURM_ARRAY_TASK_ID}
   --sample ukb61666_imp_chr${CHR}_v3_s487280.sample \
   --keep   /phenos/ukb_samples_group2.txt \
   --pheno  /phenos/ukb_phenotypes.txt \
-  --pheno-name AD T1D T2D SCZ ASTHMA height bmi weight mono_pct neutro_pct baso_pct \
+  --pheno-name AD T1D T2D SCZ ASTHMA height bmi weight mono_pct neutro_pct baso_pct wbc rbc mch \
   --covar  /phenos/ukb.covariates.txt \
   --covar-name sex age age2 sex_age sex_age2 PC1-PC20 \
   --covar-variance-standardize \
   --maf 0.001 --max-maf 0.999 \
+  --vif 80 \
   --hwe 1e-10 midp keep-fewhet \
   --geno 0.05 \
   --glm hide-covar cols=+a1freq \

@@ -1,5 +1,5 @@
 #!/bin/bash
-## Get AOU data (ACAF)
+## Get AOU genotype data (ACAF)
 ######################
 
 #Variant data
@@ -57,7 +57,6 @@ echo
 echo "Done."
 
 # Variant annotation file
-
 VAT="${CDR_STORAGE_PATH}/wgs/short_read/snpindel/aux/vat/vat_complete.bgz.tsv.gz"
 OUT="vat_rsids.clean.tsv"
 
