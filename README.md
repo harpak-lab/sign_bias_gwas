@@ -8,7 +8,7 @@ Welcome! Here you can find the code to reproduce the analyses of "Representation
 2. Code used to perform all analyses and plotting can be found in the [scripts](/scripts) directory.
 3. The following software was used to perform analyses:
    * [R](https://www.r-project.org/)
-   * [Python] (https://www.python.org/)
+   * [Python](https://www.python.org/)
    * [RStudio](https://posit.co/download/rstudio-desktop/)
    * [plink 2.0](https://www.cog-genomics.org/plink/2.0/)
    * [ashr](https://cran.r-project.org/web/packages/ashr/index.html)
