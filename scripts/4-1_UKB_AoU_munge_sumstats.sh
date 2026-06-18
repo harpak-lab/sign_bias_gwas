@@ -51,8 +51,8 @@ run_munge() {
 }
 
 # SNPs
-AOU_SNP="/data/Neale.variants.tsv"
-UKB_SNP="/hm3/hm3_snplist_hg38.txt"
+AOU_SNP="/hm3/hm3_snplist_hg38.txt"
+UKB_SNP="/data/Neale.variants.tsv"
 
 # AoU: preprocess then munge
 AOU_A1="Allele1"
